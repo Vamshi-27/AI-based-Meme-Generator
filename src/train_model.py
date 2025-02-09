@@ -32,26 +32,37 @@ class MemeCaptionModel:
 
         for epoch in range(num_epochs):
             total_loss = 0
+            print(f"\n=== Epoch {epoch + 1}/{num_epochs} ===")
+            
+            for batch_idx, (image_path, caption) in enumerate(data_loader):
+                try:
+                    # Load image and extract features
+                    image = Image.open(image_path).convert("RGB")
+                    image_features = self.get_image_features(image)
 
-            for image_path, caption in data_loader:
-                image = Image.open(image_path).convert("RGB")
-                image_features = self.get_image_features(image)
+                    # Prepare the input prompt for GPT-2
+                    text_input = f"Image features: {image_features.sum().item()}. Caption: "
+                    input_ids = self.gpt2_tokenizer.encode(text_input, return_tensors="pt").to(self.device)
+                    labels = self.gpt2_tokenizer.encode(caption, return_tensors="pt").to(self.device)
 
-                # Prepare the input prompt for GPT-2
-                text_input = f"Image features: {image_features.sum().item()}. Caption: "
-                input_ids = self.gpt2_tokenizer.encode(text_input, return_tensors="pt").to(self.device)
-                labels = self.gpt2_tokenizer.encode(caption, return_tensors="pt").to(self.device)
+                    # Forward pass and compute loss
+                    outputs = self.gpt2_model(input_ids, labels=labels)
+                    loss = outputs.loss
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
 
-                outputs = self.gpt2_model(input_ids, labels=labels)
-                loss = outputs.loss
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+                    total_loss += loss.item()
 
-                total_loss += loss.item()
+                    # Print progress for each batch
+                    if batch_idx % 10 == 0:
+                        print(f"Batch {batch_idx}/{len(data_loader)} - Loss: {loss.item():.4f}")
+                except Exception as e:
+                    print(f"Error processing batch {batch_idx}: {e}")
 
-            print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {total_loss / len(data_loader)}")
+            avg_loss = total_loss / len(data_loader)
+            print(f"Epoch {epoch + 1} completed. Average Loss: {avg_loss:.4f}")
 
     def save_model(self, path):
         torch.save(self.gpt2_model.state_dict(), path)
-
+        print(f"Model saved successfully at {path}")
