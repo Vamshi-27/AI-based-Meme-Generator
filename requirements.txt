@@ -6,4 +6,3 @@ clip-by-openai
 pandas
 torchvision
 numpy
-Pillow
